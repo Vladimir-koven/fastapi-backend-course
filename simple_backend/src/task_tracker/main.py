@@ -9,15 +9,19 @@ def get_tasks():
     return task_manager.get_all()
 
 @app.post("/tasks")
-def create_task(task):
+def create_task(task: dict):
+    if not isinstance(task, dict):
+        raise HTTPException(status_code=400, detail='Invalid data format')
     return task_manager.create(
-        task.get('title', ''),
-        task.get('description', ''),
-        task.get('status', False)
+        title=task.get('title', ''),
+        description=task.get('description', ''),
+        status=task.get('status', False)
         )
 
 @app.put("/tasks/{task_id}")
 def update_task(task_id: int, task_update: dict):
+    if not isinstance(task_update, dict):
+        raise HTTPException(status_code=400, detail='Invalid data format')
     update = task_manager.update(task_id, **task_update)
     if not update:
         raise  HTTPException(404, 'Task not found')
