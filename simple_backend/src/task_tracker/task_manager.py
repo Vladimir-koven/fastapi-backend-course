@@ -1,17 +1,16 @@
 import json
-import os
 
 
 class TaskManager:
-    def init(self, file="tasks.json"):
+    def __init__(self, file="tasks.json"):
         self.file = file
-        if not os.path.exists(file):
-            with open(file, 'w') as f:
-                json.dump([], f)
 
     def _tasks(self):
-        with open(self.file, 'r') as f:
-            return json.load(f)
+        try:
+            with open(self.file, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return []
 
     def _save(self, tasks):
         with open(self.file, 'w') as f:
@@ -20,7 +19,9 @@ class TaskManager:
     def create(self, title, description="", status=False):
         tasks = self._tasks()
         for task in tasks:
-            task_id = max(task.get('id', 0), default=0) + 1
+            task_id = max(task['id']) + 1
+        else:
+            task_id = 1
         new_task = {"id": task_id,
                     "title": title,
                     "description": description,
@@ -39,7 +40,7 @@ class TaskManager:
             if task['id'] == task_id:
                 for k, v in updates.items():
                     if v is not None:
-                        task.update(k, v)
+                        task[k] == v
                 self._save(tasks)
                 return task
         return None

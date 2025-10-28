@@ -25,5 +25,7 @@ def update_task(task_id: int, task_update: dict):
 
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: int):
-    task_manager.delete(task_id)
+    result = task_manager.delete(task_id)
+    if not result:
+        raise HTTPException(status_code=404, detail='Task not found')
     return {'message': 'Task deleted'}
