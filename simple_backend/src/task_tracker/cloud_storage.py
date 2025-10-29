@@ -1,5 +1,5 @@
 import requests
-
+from typing import List
 
 class JSONBinStorage:
     def __init__(self, bin_id: str, api_key: str):
@@ -11,13 +11,13 @@ class JSONBinStorage:
             'Content-Type': 'application/json'
         }
 
-    def load_data(self):
+    def load_data(self) -> List[dict]:
         response = requests.get(self.base_url, headers=self.headers)
         if response.status_code == 200:
             data = response.json()
             return data.get('record', [])
         return []
 
-    def save_data(self, data):
+    def save_data(self, data: List[dict]) -> bool:
         response = requests.put(self.base_url, json=data, headers=self.headers)
         return response.status_code == 200
