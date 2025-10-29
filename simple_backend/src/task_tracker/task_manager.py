@@ -1,43 +1,39 @@
-import json
 import os
+from cloud_storage import JSONBinStorage
+from dotenv import load_dotenv
+
+
+load_dotenv('passwords.env')
 
 class TaskManager:
-    def __init__(self, file="tasks.json"):
-        self.file = file
+    def __init__(self):
+        self.bin_id = os.getenv('JSON_BIN_ID')
+        self.api_key = os.getenv('JSON_API_KEY')
+        if not self.bin_id or not self.api_key:
+            raise ValueError('Не найдены JSON_BIN_ID или JSON_API_KEY')
+        self.storage = JSONBinStorage(self.bin_id, self.api_key)
 
     def _tasks(self):
-        try:
-            with open(self.file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
+        return self.storage.load_data()
+
+    def get_all(self):
+        return self._tasks()
 
     def _save(self, tasks):
-        try:
-            with open(self.file, 'w', encoding='utf-8') as f:
-                json.dump(tasks, f, indent=2, ensure_ascii=False)
-            return True
-        except Exception:
-            return False
+        return self.storage.save_data(tasks)
 
-    def create(self, title, description="", status=False):
+    def create(self, title, description='', status=False):
         tasks = self._tasks()
-        if tasks:
-            ids = [task['id'] for task in tasks if 'id' in task]
-            task_id = max(ids) + 1 if ids else 1
-        else:
-            task_id = 1
-        new_task = {"id": task_id,
-                    "title": title,
-                    "description": description,
-                    "status": status
+        ids = [task['id'] for task in tasks] if tasks else []
+        task_id = max(ids) + 1 if ids else 1
+        new_task = {'id': task_id,
+                    'title': title,
+                    'description': description,
+                    'status': status
                     }
         tasks.append(new_task)
         self._save(tasks)
         return new_task
-
-    def get_all(self):
-        return self._tasks()
 
     def update(self, task_id, **updates):
         tasks = self._tasks()
@@ -45,7 +41,7 @@ class TaskManager:
             if task['id'] == task_id:
                 for k, v in updates.items():
                     if v is not None:
-                        task[k] == v
+                        task[k] = v
                 self._save(tasks)
                 return task
         return None
