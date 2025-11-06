@@ -6,13 +6,13 @@ class JSONBinStorage(BaseHTTPClient):
     def __init__(self, bin_id: str, api_key: str):
         self.bin_id = bin_id
         self.api_key = api_key
-        self.validate_credentials()  # ← Вызов абстрактного метода
         base_url = f'https://api.jsonbin.io/v3/b/{self.bin_id}'
         headers = {
             'X-Master-Key': self.api_key,
             'Content-Type': 'application/json'
         }
         super().__init__(base_url, headers)
+        self.validate_credentials()
 
     def validate_credentials(self):
         if not self.bin_id or not self.api_key:

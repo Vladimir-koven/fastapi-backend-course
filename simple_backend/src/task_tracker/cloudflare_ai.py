@@ -5,8 +5,10 @@ from pydantic import BaseModel
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 
-load_dotenv('passwords.env')
+load_dotenv()
 
+class AIException(Exception): # Для ошибок AI сервиса
+    pass
 
 class BaseHTTPClient(ABC):
     def __init__(self, base_url: str, headers: Dict[str, str], timeout: int = 30):
@@ -25,12 +27,18 @@ class BaseHTTPClient(ABC):
                 timeout=self.timeout,
                 **kwargs
             )
-            if response.status_code == 200:
-                return response.json()
-            else:
-                raise Exception(f"HTTP Error {response.status_code}: {response.text}")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else "Unknown"
+            text = e.response.text if e.response else str(e)
+            raise AIException(f"HTTP Error {status_code}: {text}")
+        except requests.exceptions.ConnectionError as e:
+            raise AIException(f"Connection error: {e}")
+        except requests.exceptions.Timeout as e:
+            raise AIException(f"Request timeout: {e}")
         except requests.RequestException as e:
-            raise Exception(f"Network error: {e}")
+            raise AIException(f"Network error: {e}")
 
     @abstractmethod
     def validate_credentials(self):
@@ -57,6 +65,7 @@ class CloudflareAI(BaseHTTPClient):
             "Content-Type": "application/json"
         }
         super().__init__(base_url, headers)
+        self.validate_credentials()
 
     def validate_credentials(self):
         if not self.api_token or not self.account_id:
@@ -66,16 +75,19 @@ class CloudflareAI(BaseHTTPClient):
         return "Cloudflare AI"
 
     def generate_solution(self, task_text: str) -> str:
-        payload = AIRequest(
-            messages=[
-                {"role": "system",
-                 "content": "Ты — опытный проектный менеджер. Предложи 3–5 конкретных шагов для решения задачи. Формат: нумерованный список."
-                 },
-                {"role": "user",
-                 "content": task_text
-                 }
-            ]
-        )
-        result = self._make_request("POST", "@cf/meta/llama-3-8b-instruct", json=payload.model_dump())
-        ai_response = AIResponse(**result["result"])
-        return ai_response.response
+        try:
+            payload = AIRequest(
+                messages=[
+                    {"role": "system",
+                    "content": "Ты — опытный проектный менеджер. Предложи 3–5 конкретных шагов для решения задачи. Формат: нумерованный список."
+                    },
+                    {"role": "user",
+                    "content": task_text
+                    }
+                ]
+            )
+            result = self._make_request("POST", "@cf/meta/llama-3-8b-instruct", json=payload.model_dump())
+            ai_response = AIResponse(**result["result"])
+            return ai_response.response
+        except Exception as e:
+            raise AIException(f"AI service error: {e}")
