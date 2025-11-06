@@ -1,19 +1,27 @@
 import os
+import uuid
+import logging
 from cloud_storage import JSONBinStorage
 from cloudflare_ai import CloudflareAI
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional, List
 
-load_dotenv('passwords.env')
+load_dotenv()
+logger = logging.getLogger(__name__)
 
 class TaskModel(BaseModel):
     title: str
     description: Optional[str] = None
     status: bool = False
 
+class TaskUpdateModel(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[bool] = None
+
 class TaskResponse(TaskModel):
-    id: int
+    id: str
     ai_solution: Optional[str] = None
 
 class TaskManager:
@@ -38,14 +46,13 @@ class TaskManager:
     def create(self, title: str, description: str = '', status: bool = False) -> TaskResponse:
         task_data = TaskModel(title=title, description=description, status=status)
         tasks = self._tasks()
-        ids = [task['id'] for task in tasks] if tasks else []
-        task_id = max(ids) + 1 if ids else 1
-        ai_solution = ''
+        task_id = str(uuid.uuid4())
+        ai_solution = None
         if task_data.description:
             try:
                 ai_solution = self.ai.generate_solution(f'{task_data.title}. {task_data.description}')
             except Exception as e:
-                ai_solution = f'{e}. Не удалось сгенерировать решение'
+                logger.error(f"AI generation failed for task '{task_data.title}': {e}")
 
         new_task = {'id': task_id,
                     'title': task_data.title,
@@ -57,22 +64,23 @@ class TaskManager:
         self._save(tasks)
         return TaskResponse(**new_task)
 
-    def update(self, task_id: int, **updates) -> Optional[TaskResponse]:
-        update_data = TaskModel(**updates)
+    def update(self, task_id: str, **updates) -> Optional[TaskResponse]:
+        update_data = TaskUpdateModel(**updates)
         valid_updates = update_data.model_dump(exclude_unset=True)
         if not valid_updates:
             return None
         tasks = self._tasks()
         for task in tasks:
             if task['id'] == task_id:
-                for k, v in valid_updates.items():
-                    if v is not None:
-                        task[k] = v
+                curr_task = TaskResponse(**task)
+                updated_task = curr_task.model_copy(update=valid_updates)
+                for key, value in valid_updates.items():
+                    task[key] = value
                 self._save(tasks)
-                return TaskResponse(**task)
+                return updated_task
         return None
 
-    def delete(self, task_id: int) -> bool:
+    def delete(self, task_id: str) -> bool:
         tasks = self._tasks()
         initial_count = len(tasks)
         tasks = [task for task in tasks if task.get('id') != task_id]

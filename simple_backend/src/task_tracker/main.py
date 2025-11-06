@@ -1,22 +1,15 @@
 from fastapi import FastAPI, HTTPException
-from task_manager import TaskManager
-from pydantic import BaseModel
-from typing import Optional
-
+from task_manager import TaskManager, TaskModel, TaskUpdateModel, TaskResponse
+from typing import List
 
 app = FastAPI()
 task_manager = TaskManager()
 
-class TaskModel(BaseModel):
-    title: str
-    description: Optional[str] = None
-    status: bool = False
-
-@app.get('/tasks')
+@app.get('/tasks', response_model=List[TaskResponse])
 def get_tasks():
     return task_manager.get_all()
 
-@app.post('/tasks')
+@app.post('/tasks', response_model=TaskResponse)
 def create_task(task: TaskModel):
     try:
         task_data = task.model_dump()
@@ -28,8 +21,8 @@ def create_task(task: TaskModel):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/tasks/{task_id}")
-def update_task(task_id: int, task_update: TaskModel):
+@app.put("/tasks/{task_id}", response_model=TaskResponse)
+def update_task(task_id: str, task_update: TaskUpdateModel):
     update_data = task_update.model_dump(exclude_unset=True)
     update = task_manager.update(task_id, **update_data)
     if not update:
@@ -37,7 +30,7 @@ def update_task(task_id: int, task_update: TaskModel):
     return update
 
 @app.delete('/tasks/{task_id}')
-def delete_task(task_id: int):
+def delete_task(task_id: str):
     result = task_manager.delete(task_id)
     if not result:
         raise HTTPException(status_code=404, detail='Task not found')

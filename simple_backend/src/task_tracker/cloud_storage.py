@@ -1,4 +1,3 @@
-import os
 from cloudflare_ai import BaseHTTPClient
 from typing import List
 
